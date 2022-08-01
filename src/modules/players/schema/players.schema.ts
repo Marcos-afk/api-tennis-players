@@ -1,16 +1,30 @@
-import { Schema } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-const PlayersSchema = new Schema(
-  {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    phoneNumber: { type: String, required: true, unique: true },
-    ranking: { type: String, default: 'D' },
-    positionRanking: { type: Number, default: 0 },
-    urlPlayerPhoto: { type: String },
-  },
-  { timestamps: true },
-);
+export type PlayersDocument = Players & Document;
 
-export default PlayersSchema;
+@Schema()
+export class Players {
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ required: true, unique: true })
+  email: string;
+
+  @Prop({ required: true })
+  password: string;
+
+  @Prop({ required: true, unique: true })
+  phoneNumber: string;
+
+  @Prop({ default: 'D' })
+  ranking?: string;
+
+  @Prop({ default: 0 })
+  positionRanking?: number;
+
+  @Prop()
+  urlPlayerPhoto?: string;
+}
+
+export const PlayersSchema = SchemaFactory.createForClass(Players);

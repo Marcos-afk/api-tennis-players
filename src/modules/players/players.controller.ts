@@ -7,6 +7,7 @@ import { PlayersService } from './players.service';
 @Controller('api/players')
 export class PlayersController {
   constructor(private readonly playersService: PlayersService) {}
+
   @Get()
   async findAll(@Res() res: Response) {
     const players = await this.playersService.findAll();

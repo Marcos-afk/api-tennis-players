@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { hash } from 'bcrypt';
 import { Model } from 'mongoose';
 import { CreatePlayerDto } from '../dto/createPlayer.dto';
 import { UpdatePlayerDto } from '../dto/updatePlayer.dto';
-import { IPlayers } from '../models/player.model';
-import { ValidateIdObject } from 'src/config/utils/ValidateIdObject';
-import { ConvertTo_id } from 'src/config/utils/ConvertTo_id';
+import { convertTo_id } from 'src/modules/players/utils/convertTo_id';
 import { NotFoundError } from 'src/common/errors/types/NotFoundError';
 import { BadRequestError } from 'src/common/errors/types/BadRequestError';
+import { Players, PlayersDocument } from '../schema/players.schema';
+import { comparePassword, hashPassword } from '../utils/bcryptFunctions';
 
 @Injectable()
 export class PlayersRepository {
-  constructor(@InjectModel('Players') private readonly playersModel: Model<IPlayers>) {}
+  constructor(@InjectModel(Players.name) private readonly playersModel: Model<PlayersDocument>) {}
 
-  async findAll() {
+  async findAll(): Promise<PlayersDocument[]> {
     const players = await this.playersModel.find();
     if (players.length === 0) {
       throw new NotFoundError('Nenhum jogador encontrado');
@@ -23,12 +22,12 @@ export class PlayersRepository {
     return players;
   }
 
-  async findById(id: string) {
-    if (!ValidateIdObject(id)) {
+  async findById(id: string): Promise<PlayersDocument> {
+    const _id = convertTo_id(id);
+    if (!_id) {
       throw new BadRequestError('Formato de id inválido');
     }
 
-    const _id = ConvertTo_id(id);
     const player = await this.playersModel.findById(_id);
     if (!player) {
       throw new NotFoundError('Jogador não encontrado');
@@ -37,15 +36,23 @@ export class PlayersRepository {
     return player;
   }
 
-  async create(player: CreatePlayerDto) {
+  async findByEmail(email: string): Promise<PlayersDocument | undefined> {
+    return await this.playersModel.findOne({ email });
+  }
+
+  async findByPhone(phoneNumber: string): Promise<PlayersDocument | undefined> {
+    return await this.playersModel.findOne({ phoneNumber: phoneNumber.replace(/\s/g, '') });
+  }
+
+  async create(player: CreatePlayerDto): Promise<PlayersDocument> {
     const { name, email, phoneNumber, password, confirmPassword, ranking, positionRanking, urlPlayerPhoto } = player;
 
-    const isExistEmail = await this.playersModel.findOne({ email });
+    const isExistEmail = await this.findByEmail(email);
     if (isExistEmail) {
       throw new BadRequestError('Email já cadastrado');
     }
 
-    const isExistPhoneNumber = await this.playersModel.findOne({ phoneNumber });
+    const isExistPhoneNumber = await this.findByPhone(phoneNumber);
     if (isExistPhoneNumber) {
       throw new BadRequestError('Número de telefone já cadastrado');
     }
@@ -54,11 +61,11 @@ export class PlayersRepository {
       throw new BadRequestError('Senhas não conferem');
     }
 
-    const hashedPassword = await hash(password, 10);
+    const hashedPassword = await hashPassword(password);
     return await this.playersModel.create({
       name,
       email,
-      phoneNumber,
+      phoneNumber: phoneNumber.replace(/\s/g, ''),
       password: hashedPassword,
       ranking,
       positionRanking,
@@ -66,29 +73,24 @@ export class PlayersRepository {
     });
   }
 
-  async update(id: string, player: UpdatePlayerDto) {
-    if (!ValidateIdObject(id)) {
+  async update(id: string, player: UpdatePlayerDto): Promise<PlayersDocument> {
+    const _id = convertTo_id(id);
+    if (!_id) {
       throw new BadRequestError('Formato de id inválido');
     }
 
-    const _id = ConvertTo_id(id);
+    const playerToUpdate = await this.findById(id);
     const { name, email, phoneNumber, password, confirmPassword, ranking, positionRanking, urlPlayerPhoto } = player;
-    let newPassword = '';
-
-    const playerToUpdate = await this.playersModel.findById(_id);
-    if (!playerToUpdate) {
-      throw new NotFoundError('Jogador não encontrado');
-    }
 
     if (email) {
-      const isExistEmail = await this.playersModel.findOne({ email });
+      const isExistEmail = await this.findByEmail(email);
       if (isExistEmail && isExistEmail._id.toString() !== _id.toString()) {
         throw new BadRequestError('Email já cadastrado');
       }
     }
 
     if (phoneNumber) {
-      const isExistPhoneNumber = await this.playersModel.findOne({ phoneNumber });
+      const isExistPhoneNumber = await this.findByPhone(phoneNumber);
       if (isExistPhoneNumber && isExistPhoneNumber._id.toString() !== _id.toString()) {
         throw new BadRequestError('Número de telefone já cadastrado');
       }
@@ -103,13 +105,17 @@ export class PlayersRepository {
         throw new BadRequestError('Senhas não conferem');
       }
 
-      newPassword = await hash(password, 10);
+      const comparedPassword = await comparePassword(playerToUpdate.password, password);
+      if (comparedPassword) {
+        throw new BadRequestError('Senha nova não pode ser igual a antiga');
+      }
+
+      playerToUpdate.password = await hashPassword(password);
     }
 
     playerToUpdate.name = name || playerToUpdate.name;
     playerToUpdate.email = email || playerToUpdate.email;
-    playerToUpdate.phoneNumber = phoneNumber || playerToUpdate.phoneNumber;
-    playerToUpdate.password = newPassword || playerToUpdate.password;
+    playerToUpdate.phoneNumber = phoneNumber?.replace(/\s/g, '') || playerToUpdate.phoneNumber;
     playerToUpdate.ranking = ranking || playerToUpdate.ranking;
     playerToUpdate.positionRanking = positionRanking || playerToUpdate.positionRanking;
     playerToUpdate.urlPlayerPhoto = urlPlayerPhoto || playerToUpdate.urlPlayerPhoto;
@@ -117,17 +123,8 @@ export class PlayersRepository {
     return await playerToUpdate.save();
   }
 
-  async delete(id: string) {
-    if (!ValidateIdObject(id)) {
-      throw new BadRequestError('Formato de id inválido');
-    }
-
-    const _id = ConvertTo_id(id);
-    const player = await this.playersModel.findById(_id);
-    if (!player) {
-      throw new NotFoundError('Jogador não encontrado');
-    }
-
+  async delete(id: string): Promise<PlayersDocument> {
+    const player = await this.findById(id);
     return await player.remove();
   }
 }
