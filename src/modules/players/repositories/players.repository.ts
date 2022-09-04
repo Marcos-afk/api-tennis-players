@@ -3,11 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreatePlayerDto } from '../dto/createPlayer.dto';
 import { UpdatePlayerDto } from '../dto/updatePlayer.dto';
-import { convertTo_id } from 'src/modules/players/utils/convertTo_id';
+import { convertTo_id } from 'src/config/utils/convertTo_id';
 import { NotFoundError } from 'src/common/errors/types/NotFoundError';
 import { BadRequestError } from 'src/common/errors/types/BadRequestError';
 import { Players, PlayersDocument } from '../schema/players.schema';
-import { comparePassword, hashPassword } from '../utils/bcryptFunctions';
+import { comparePassword, hashPassword } from '../../../config/utils/bcryptFunctions';
 
 @Injectable()
 export class PlayersRepository {
@@ -25,7 +25,7 @@ export class PlayersRepository {
   async findById(id: string): Promise<PlayersDocument> {
     const _id = convertTo_id(id);
     if (!_id) {
-      throw new BadRequestError('Formato de id inválido');
+      throw new BadRequestError('Formato de id de jogador inválido');
     }
 
     const player = await this.playersModel.findById(_id);
@@ -41,12 +41,19 @@ export class PlayersRepository {
   }
 
   async findByPhone(phoneNumber: string): Promise<PlayersDocument | undefined> {
-    return await this.playersModel.findOne({ phoneNumber: phoneNumber.replace(/\s/g, '') });
+    return await this.playersModel.findOne({ phoneNumber });
   }
 
-  async create(player: CreatePlayerDto): Promise<PlayersDocument> {
-    const { name, email, phoneNumber, password, confirmPassword, ranking, positionRanking, urlPlayerPhoto } = player;
-
+  async create({
+    name,
+    email,
+    phoneNumber,
+    password,
+    confirmPassword,
+    ranking,
+    positionRanking,
+    urlPlayerPhoto,
+  }: CreatePlayerDto): Promise<PlayersDocument> {
     const isExistEmail = await this.findByEmail(email);
     if (isExistEmail) {
       throw new BadRequestError('Email já cadastrado');
@@ -65,7 +72,7 @@ export class PlayersRepository {
     return await this.playersModel.create({
       name,
       email,
-      phoneNumber: phoneNumber.replace(/\s/g, ''),
+      phoneNumber,
       password: hashedPassword,
       ranking,
       positionRanking,
@@ -73,25 +80,22 @@ export class PlayersRepository {
     });
   }
 
-  async update(id: string, player: UpdatePlayerDto): Promise<PlayersDocument> {
-    const _id = convertTo_id(id);
-    if (!_id) {
-      throw new BadRequestError('Formato de id inválido');
-    }
-
+  async update(
+    id: string,
+    { name, email, phoneNumber, password, confirmPassword, ranking, positionRanking, urlPlayerPhoto }: UpdatePlayerDto,
+  ): Promise<PlayersDocument> {
     const playerToUpdate = await this.findById(id);
-    const { name, email, phoneNumber, password, confirmPassword, ranking, positionRanking, urlPlayerPhoto } = player;
 
     if (email) {
       const isExistEmail = await this.findByEmail(email);
-      if (isExistEmail && isExistEmail._id.toString() !== _id.toString()) {
+      if (isExistEmail && isExistEmail._id.toString() !== playerToUpdate._id.toString()) {
         throw new BadRequestError('Email já cadastrado');
       }
     }
 
     if (phoneNumber) {
       const isExistPhoneNumber = await this.findByPhone(phoneNumber);
-      if (isExistPhoneNumber && isExistPhoneNumber._id.toString() !== _id.toString()) {
+      if (isExistPhoneNumber && isExistPhoneNumber._id.toString() !== playerToUpdate._id.toString()) {
         throw new BadRequestError('Número de telefone já cadastrado');
       }
     }
@@ -115,7 +119,7 @@ export class PlayersRepository {
 
     playerToUpdate.name = name || playerToUpdate.name;
     playerToUpdate.email = email || playerToUpdate.email;
-    playerToUpdate.phoneNumber = phoneNumber?.replace(/\s/g, '') || playerToUpdate.phoneNumber;
+    playerToUpdate.phoneNumber = phoneNumber || playerToUpdate.phoneNumber;
     playerToUpdate.ranking = ranking || playerToUpdate.ranking;
     playerToUpdate.positionRanking = positionRanking || playerToUpdate.positionRanking;
     playerToUpdate.urlPlayerPhoto = urlPlayerPhoto || playerToUpdate.urlPlayerPhoto;

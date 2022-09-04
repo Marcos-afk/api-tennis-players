@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 export type PlayersDocument = Players & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Players {
   @Prop({ required: true })
   name: string;
