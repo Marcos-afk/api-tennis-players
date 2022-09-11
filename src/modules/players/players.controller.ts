@@ -11,7 +11,7 @@ export class PlayersController {
   @Get()
   async findAll(@Res() res: Response) {
     const players = await this.playersService.findAll();
-    return res.status(HttpStatus.OK).json({ message: 'Lista de jogadores', players });
+    return res.status(HttpStatus.OK).json({ message: 'Lista de jogadores!', players });
   }
 
   @Get(':id')

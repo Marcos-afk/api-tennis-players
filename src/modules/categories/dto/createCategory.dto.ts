@@ -50,5 +50,6 @@ export class CreateCategoryDto {
 
   @IsOptional()
   @IsArray({ message: 'O tipo do campo jogadores deve ser um array' })
+  @IsString({ each: true })
   players: string[];
 }

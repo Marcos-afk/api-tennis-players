@@ -50,6 +50,12 @@ export class CategoriesRepository {
     return await this.categoriesModel.findOne({ category });
   }
 
+  async findCategoryByPlayer(id: string): Promise<CategoriesDocument> {
+    const player = await this.playersRepository.findById(id);
+
+    return await this.categoriesModel.findOne({ players: player });
+  }
+
   async create({ category, description, events, players }: CreateCategoryDto): Promise<CategoriesDocument> {
     const isExistCategory = await this.findByCategory(category);
     if (isExistCategory) {
@@ -59,6 +65,10 @@ export class CategoriesRepository {
     if (players && players.length > 0) {
       for (const [, value] of players.entries()) {
         await this.playersRepository.findById(value);
+        const isExistCategoryPlayer = await this.findCategoryByPlayer(value);
+        if (isExistCategoryPlayer) {
+          throw new BadRequestError('Jogador já está vinculado a uma categoria');
+        }
       }
     }
 
@@ -83,6 +93,10 @@ export class CategoriesRepository {
     if (players && players.length > 0) {
       for (const [, value] of players.entries()) {
         await this.playersRepository.findById(value);
+        const isExistCategoryPlayer = await this.findCategoryByPlayer(value);
+        if (isExistCategoryPlayer && isExistCategoryPlayer._id.toString() !== categoryToUpdate._id.toString()) {
+          throw new BadRequestError('Jogador já está vinculado a uma categoria');
+        }
       }
     }
 
